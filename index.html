@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SPARK GRID | IoT Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background: #020617; color: white; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body class="p-4 flex items-center justify-center min-h-screen">
+
+    <div id="auth-ui" class="glass p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
+        <h2 id="auth-title" class="text-3xl font-black italic mb-6 text-sky-400 text-center">LOGIN</h2>
+        <div class="space-y-4">
+            <input id="uid" type="text" placeholder="User ID" class="w-full bg-slate-900 p-4 rounded-xl border border-white/10 outline-none">
+            <input id="upw" type="password" placeholder="Password" class="w-full bg-slate-900 p-4 rounded-xl border border-white/10 outline-none">
+            <button onclick="handleAuth()" class="w-full bg-sky-600 p-4 rounded-xl font-bold hover:bg-sky-500 transition-all">Submit</button>
+            <button id="toggle-btn" onclick="toggleAuth()" class="w-full text-sky-400 text-sm font-medium">Create New Account</button>
+        </div>
+    </div>
+
+    <div id="home-page" class="hidden w-full max-w-5xl space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="glass p-6 rounded-3xl text-center">
+                <p class="text-slate-400 text-xs uppercase">Current Load</p>
+                <h3 class="text-2xl font-bold">450W</h3>
+            </div>
+            <div class="glass p-6 rounded-3xl text-center">
+                <p class="text-slate-400 text-xs uppercase">Tariff Rate</p>
+                <h3 class="text-2xl font-bold">₹7.50/unit</h3>
+            </div>
+            <div class="glass p-6 rounded-3xl text-center text-green-400">
+                <p class="text-slate-400 text-xs uppercase">Power Consumed</p>
+                <h3 class="text-2xl font-bold">12.4 kWh</h3>
+            </div>
+            <button onclick="showTab('analytics')" class="bg-sky-600 rounded-3xl font-bold uppercase text-xs">Analytics</button>
+        </div>
+
+        <div id="appliances" class="glass p-8 rounded-[3rem]">
+            <h2 class="text-xl font-bold mb-4">Connected Appliances</h2>
+            <div id="device-list" class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-900/50 p-4 rounded-2xl flex justify-between"><span>Air Conditioner</span><button class="text-red-500">Remove</button></div>
+                <div class="bg-slate-900/50 p-4 rounded-2xl flex justify-between"><span>Water Heater</span><button class="text-red-500">Remove</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="analytics-page" class="hidden glass p-10 rounded-[3rem] w-full max-w-4xl">
+        <h2 class="text-2xl font-black italic mb-6 text-amber-400">USER ANALYTICS</h2>
+        <canvas id="usageChart"></canvas>
+        <button onclick="showTab('home')" class="mt-6 text-sky-400 underline">Back to Dashboard</button>
+    </div>
+
+    <script>
+        let isReg = false;
+        function toggleAuth() {
+            isReg = !isReg;
+            document.getElementById('auth-title').innerText = isReg ? "REGISTER" : "LOGIN";
+            document.getElementById('toggle-btn').innerText = isReg ? "Already have an account? Login" : "Create New Account";
+        }
+
+        async function handleAuth() {
+            const u = document.getElementById('uid').value;
+            const p = document.getElementById('upw').value;
+            const res = await fetch(isReg ? '/register' : '/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({u, p})
+            });
+            const data = await res.json();
+            if(data.ok) {
+                if(isReg) { alert("Account Created! Login now."); toggleAuth(); }
+                else { showTab('home'); initChart(); }
+            } else alert("Error! Check details.");
+        }
+
+        function showTab(tab) {
+            document.getElementById('auth-ui').classList.add('hidden');
+            document.getElementById('home-page').classList.add('hidden');
+            document.getElementById('analytics-page').classList.add('hidden');
+            document.getElementById(tab + '-page').classList.remove('hidden');
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('usageChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{ label: 'Daily Use (kWh)', data: [12, 19, 15, 8, 11, 22, 14], backgroundColor: '#0ea5e9' }]
+                },
+                options: { scales: { y: { beginAtZero: true } } }
+            });
+        }
+    </script>
+</body>
+</html>
