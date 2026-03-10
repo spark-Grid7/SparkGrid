@@ -1,144 +1,149 @@
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+import random
 import pandas as pd
-import sqlite3
 
 app = FastAPI()
 
-def get_db():
-    return sqlite3.connect("database.db")
+# Allow browser requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-def init_db():
-    conn = get_db()
-    cur = conn.cursor()
+# -------------------------
+# USERS DATABASE
+# -------------------------
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users(
-        username TEXT,
-        password TEXT
-    )
-    """)
+users = {
+    "admin": {"password": "spark123", "role": "admin"},
+    "user1": {"password": "grid123", "role": "user"},
+}
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS devices(
-        user TEXT,
-        device TEXT,
-        power INTEGER
-    )
-    """)
+# -------------------------
+# DEVICES (Example)
+# -------------------------
 
-    conn.commit()
-    conn.close()
+devices = [
+    {"name": "5V Pump", "pin": 23},
+    {"name": "5V LED", "pin": 2}
+]
 
-init_db()
-
-
-@app.get("/", response_class=HTMLResponse)
-def home():
-    return open("index.html").read()
-
+# -------------------------
+# LOGIN API
+# -------------------------
 
 @app.post("/login")
-def login(username: str = Form(...), password: str = Form(...)):
+async def login(data: dict):
 
-    conn = get_db()
-    cur = conn.cursor()
+    username = data.get("username")
+    password = data.get("password")
 
-    cur.execute("SELECT * FROM users WHERE username=? AND password=?",
-                (username, password))
+    if username in users and users[username]["password"] == password:
+        return {"status": "ok", "role": users[username]["role"]}
 
-    data = cur.fetchone()
-
-    if data:
-        return RedirectResponse("/dashboard/"+username, status_code=303)
-
-    return {"message":"Invalid Login"}
+    return JSONResponse({"error": "invalid"}, status_code=401)
 
 
-@app.post("/signup")
-def signup(username: str = Form(...), password: str = Form(...)):
+# -------------------------
+# LIVE GRID METRICS
+# -------------------------
 
-    conn = get_db()
-    cur = conn.cursor()
+@app.get("/grid/live-metrics")
+async def live_metrics():
 
-    cur.execute("INSERT INTO users VALUES(?,?)",(username,password))
-    conn.commit()
+    watts = round(random.uniform(40,120),2)
+    amps = round(watts/230,3)
+    cost = round(watts * 0.008,2)
 
-    return RedirectResponse("/",status_code=303)
-
-
-@app.get("/dashboard/{user}", response_class=HTMLResponse)
-def dashboard(user:str):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("SELECT device,power FROM devices WHERE user=?", (user,))
-    devices = cur.fetchall()
-
-    total_power = sum([d[1] for d in devices])
-
-    tariff = 5
-    cost = total_power * tariff / 1000
-
-    html = f"""
-
-    <h1>Smart Grid Dashboard</h1>
-
-    <h2>Home</h2>
-
-    Total Load: {total_power} W<br>
-    Tariff: ₹{tariff}<br>
-    Cost: ₹{cost}
-
-    <h2>Devices</h2>
-
-    <form action="/add_device" method="post">
-    <input name="user" value="{user}" hidden>
-    Device Name <input name="device">
-    Power <input name="power">
-    <button>Add</button>
-    </form>
-
-    <h3>Device List</h3>
-
-    {devices}
-
-    <h2>Analytics</h2>
-
-    <a href="/export/{user}">Export Excel</a>
-
-    """
-
-    return HTMLResponse(html)
+    return {
+        "watts": watts,
+        "amps": amps,
+        "cost": cost
+    }
 
 
-@app.post("/add_device")
-def add_device(user:str = Form(...),
-               device:str = Form(...),
-               power:int = Form(...)):
+# -------------------------
+# ANALYTICS DATA
+# -------------------------
 
-    conn = get_db()
-    cur = conn.cursor()
+@app.get("/analytics/usage-data")
+async def usage_data():
 
-    cur.execute("INSERT INTO devices VALUES(?,?,?)",
-                (user,device,power))
+    labels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
 
-    conn.commit()
+    data = [
+        random.randint(10,35),
+        random.randint(10,35),
+        random.randint(10,35),
+        random.randint(10,35),
+        random.randint(10,35),
+        random.randint(10,35),
+        random.randint(10,35),
+    ]
 
-    return RedirectResponse("/dashboard/"+user,status_code=303)
+    return {
+        "labels": labels,
+        "data": data
+    }
 
 
-@app.get("/export/{user}")
-def export(user:str):
+# -------------------------
+# ADMIN DASHBOARD DATA
+# -------------------------
 
-    conn = get_db()
+@app.get("/admin/all-stats")
+async def admin_stats():
 
-    df = pd.read_sql_query(
-        f"SELECT device,power FROM devices WHERE user='{user}'", conn)
+    stats = {}
 
-    file="usage.xlsx"
+    for u in users:
+        stats[u] = {
+            "devices": devices,
+            "load": random.randint(50,200),
+            "role": users[u]["role"]
+        }
+
+    return stats
+
+
+# -------------------------
+# EXPORT EXCEL
+# -------------------------
+
+@app.get("/admin/export")
+async def export_excel():
+
+    data = {
+        "Day":["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+        "Usage":[
+            random.randint(10,35),
+            random.randint(10,35),
+            random.randint(10,35),
+            random.randint(10,35),
+            random.randint(10,35),
+            random.randint(10,35),
+            random.randint(10,35),
+        ]
+    }
+
+    df = pd.DataFrame(data)
+
+    file = "energy_report.xlsx"
     df.to_excel(file,index=False)
 
-    return FileResponse(file,filename="usage.xlsx")
+    return FileResponse(file,filename=file)
+
+
+# -------------------------
+# SERVE DASHBOARD
+# -------------------------
+
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    with open("index.html","r",encoding="utf-8") as f:
+        return f.read()
