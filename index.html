@@ -1,169 +1,253 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Smart Energy Dashboard</title><style>
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SPARK GRID | Global Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"><style>
+body{background:#020617;color:white;font-family:'Inter',sans-serif;overflow:hidden}
+.glass{background:rgba(15,23,42,0.9);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.05)}
+.neon-blue{text-shadow:0 0 15px #0ea5e9;color:#0ea5e9}
+.active-tab{background:#0ea5e9;color:white;box-shadow:0 0 25px rgba(14,165,233,0.4)}
+#auth-screen{position:fixed;inset:0;background:radial-gradient(circle,#1e1b4b,#020617);z-index:9999;display:flex;align-items:center;justify-content:center}
+</style></head><body class="flex p-6 gap-6 h-screen"><div id="auth-screen">
+<div class="glass p-12 w-[400px] rounded-[3rem] text-center border border-sky-500/20">
+<h1 class="text-4xl font-black mb-8 italic neon-blue">SPARK GRID</h1><input type="text" id="l-user" placeholder="USER ID"
+class="w-full bg-slate-900 border border-slate-800 p-4 rounded-2xl mb-4 text-xs font-bold outline-none focus:border-sky-500">
 
-body{
-font-family:Arial, Helvetica, sans-serif;
-margin:0;
-background:linear-gradient(135deg,#4facfe,#00f2fe);
+<input type="password" id="l-pass" placeholder="PASSWORD"
+class="w-full bg-slate-900 border border-slate-800 p-4 rounded-2xl mb-8 text-xs font-bold outline-none focus:border-sky-500">
+
+<button onclick="doLogin()"
+class="w-full bg-sky-600 py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-sky-500 transition-all">
+Authenticate
+</button>
+
+</div>
+</div><aside id="sidebar" class="hidden w-72 glass rounded-[2.5rem] p-8 flex flex-col justify-between"><div class="space-y-10"><div class="flex items-center gap-3">
+<i class="fas fa-bolt text-sky-400 text-2xl"></i>
+<span class="font-black text-xl italic">SPARK</span>
+</div><nav class="space-y-4"><button onclick="nav('home')" id="n-home"
+class="active-tab w-full text-left p-4 rounded-2xl font-bold flex items-center gap-4">
+<i class="fas fa-home"></i> Dashboard
+</button>
+
+<button onclick="nav('dev')" id="n-dev"
+class="w-full text-left p-4 rounded-2xl font-bold flex items-center gap-4 text-slate-500">
+<i class="fas fa-plug"></i> Devices
+</button>
+
+<button onclick="nav('ana')" id="n-ana"
+class="w-full text-left p-4 rounded-2xl font-bold flex items-center gap-4 text-slate-500">
+<i class="fas fa-chart-bar"></i> Analytics
+</button>
+
+<button onclick="nav('adm')" id="n-adm"
+class="hidden w-full text-left p-4 rounded-2xl font-bold flex items-center gap-4 text-amber-500">
+<i class="fas fa-server"></i> Admin Ledger
+</button>
+
+</nav>
+</div><button onclick="location.reload()" class="p-4 text-rose-500 font-bold uppercase text-[10px]">
+<i class="fas fa-power-off mr-2"></i> Shutdown
+</button></aside><main id="main-ui" class="hidden flex-1 flex flex-col gap-6 overflow-y-auto"><section id="p-home" class="space-y-6"><div class="grid grid-cols-3 gap-6"><div class="glass p-8 rounded-[2rem] border-l-8 border-sky-500">
+<p class="text-[10px] font-black uppercase text-slate-500 mb-2">Power Load</p>
+<h2 id="live-w" class="text-5xl font-black neon-blue">0.00<small class="text-sm ml-1">W</small></h2>
+</div><div class="glass p-8 rounded-[2rem] border-l-8 border-emerald-500">
+<p class="text-[10px] font-black uppercase text-slate-500 mb-2">Current Draw</p>
+<h2 id="live-a" class="text-5xl font-black text-emerald-400">0.000<small class="text-sm ml-1">A</small></h2>
+</div><div class="glass p-8 rounded-[2rem] border-l-8 border-amber-500">
+<p class="text-[10px] font-black uppercase text-slate-500 mb-2">Est. Cost / Hr</p>
+<h2 id="live-cost" class="text-5xl font-black text-amber-400">₹0.00</h2>
+</div></div><div id="appliance-grid" class="grid grid-cols-3 gap-6"></div></section><section id="p-dev" class="hidden glass p-10 rounded-[2.5rem] space-y-8"><h2 class="text-3xl font-black italic">Device Manager</h2><div class="grid grid-cols-2 gap-8"><div class="bg-slate-900/40 p-6 rounded-2xl"><input id="dev-name" placeholder="Device Name"
+class="w-full bg-slate-900 p-3 rounded-xl mb-4">
+
+<input id="dev-pin" placeholder="ESP32 GPIO Pin"
+class="w-full bg-slate-900 p-3 rounded-xl mb-4">
+
+<button onclick="addDevice()"
+class="bg-sky-600 px-6 py-3 rounded-xl font-bold w-full">
+Add Device
+</button>
+
+</div><div class="bg-slate-900/40 p-6 rounded-2xl"><select id="removeDeviceSelect"
+class="w-full bg-slate-900 p-3 rounded-xl mb-4"></select>
+
+<button onclick="removeDevice()"
+class="bg-red-600 px-6 py-3 rounded-xl font-bold w-full">
+Remove Device
+</button>
+
+</div></div></section><section id="p-ana" class="hidden glass p-10 rounded-[2.5rem] space-y-8"><div class="flex justify-between items-center"><h2 class="text-3xl font-black italic">Daily Consumption Analysis</h2><a href="/admin/export"
+class="bg-emerald-600 px-6 py-3 rounded-xl font-black text-[10px]">
+<i class="fas fa-file-excel mr-2"></i> EXCEL REPORT
+</a>
+
+</div><div class="bg-slate-900/50 p-8 rounded-[2rem] border border-white/5">
+<canvas id="usageChart" height="110"></canvas>
+</div></section><section id="p-adm" class="hidden glass p-10 rounded-[2.5rem]"><h2 class="text-3xl font-black text-amber-500 mb-8 italic">
+Master Grid Performance Ledger
+</h2><table class="w-full text-left"><thead class="text-slate-500 text-[10px] uppercase font-black border-b border-white/5">
+<tr>
+<th class="pb-4 px-4">User Identity</th>
+<th class="pb-4 px-4">Devices</th>
+<th class="pb-4 px-4">Current Load</th>
+<th class="pb-4 px-4">Role</th>
+</tr>
+</thead><tbody id="adm-table" class="divide-y divide-white/5 font-mono text-sm"></tbody></table></section></main><script>
+
+let myChart;
+let myDevices=[
+{name:"5V Pump",pin:23},
+{name:"5V LED",pin:2}
+];
+
+
+async function doLogin(){
+
+const u=document.getElementById('l-user').value
+const p=document.getElementById('l-pass').value
+
+const res=await fetch('/login',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({username:u,password:p})
+})
+
+if(res.ok){
+
+const data=await res.json()
+
+document.getElementById('auth-screen').style.display='none'
+document.getElementById('sidebar').classList.remove('hidden')
+document.getElementById('main-ui').classList.remove('hidden')
+
+if(data.role==='admin')
+document.getElementById('n-adm').classList.remove('hidden')
+
+updateUI()
+refreshDeviceList()
+
+setInterval(updateLiveMetrics,3000)
+
+}else alert("ACCESS DENIED: INCORRECT IDENTITY")
+
 }
 
-header{
-background:linear-gradient(90deg,#ff7e5f,#feb47b);
-padding:20px;
-color:white;
-text-align:center;
-font-size:28px;
-font-weight:bold;
+
+function nav(id){
+
+document.querySelectorAll('main > section')
+.forEach(s=>s.classList.add('hidden'))
+
+document.getElementById('p-'+id).classList.remove('hidden')
+
+document.querySelectorAll('nav button')
+.forEach(b=>b.classList.remove('active-tab','text-slate-500'))
+
+document.getElementById('n-'+id).classList.add('active-tab')
+
+if(id==='ana')loadChart()
+if(id==='adm')loadAdmin()
+
 }
 
-.container{
-width:340px;
-margin:auto;
-margin-top:80px;
-background:white;
-padding:30px;
-border-radius:10px;
-box-shadow:0px 8px 20px rgba(0,0,0,0.2);
-text-align:center;
+
+async function updateLiveMetrics(){
+
+const res=await fetch('/grid/live-metrics')
+const data=await res.json()
+
+document.getElementById('live-w').innerHTML=data.watts+'<small class="text-sm ml-1">W</small>'
+document.getElementById('live-a').innerHTML=data.amps+'<small class="text-sm ml-1">A</small>'
+document.getElementById('live-cost').innerText='₹'+data.cost
+
 }
 
-input{
-width:90%;
-padding:10px;
-margin:8px;
-border-radius:5px;
-border:1px solid #ccc;
+
+function updateUI(){
+
+document.getElementById('appliance-grid').innerHTML=myDevices.map(d=>`
+<div class="glass p-8 rounded-3xl border-b-4 border-sky-500/20 hover:border-sky-500 transition-all">
+<p class="text-[9px] font-black text-slate-500 uppercase mb-2">${d.name} (GPIO ${d.pin})</p>
+<h4 class="text-2xl font-black">${(Math.random()*10+5).toFixed(2)} W</h4>
+</div>`).join('')
+
 }
 
-button{
-padding:10px 20px;
-border:none;
-border-radius:5px;
-color:white;
-background:linear-gradient(45deg,#ff512f,#dd2476);
-cursor:pointer;
+
+function addDevice(){
+
+const name=document.getElementById("dev-name").value
+const pin=document.getElementById("dev-pin").value
+
+if(!name||!pin)return alert("Enter device details")
+
+myDevices.push({name:name,pin:pin})
+
+updateUI()
+refreshDeviceList()
+
 }
 
-.tabs{
-display:flex;
-justify-content:center;
-gap:10px;
-background:white;
-padding:15px;
-box-shadow:0 4px 10px rgba(0,0,0,0.2);
+
+function removeDevice(){
+
+const index=document.getElementById("removeDeviceSelect").value
+
+myDevices.splice(index,1)
+
+updateUI()
+refreshDeviceList()
+
 }
 
-.tabs button{
-background:linear-gradient(45deg,#36d1dc,#5b86e5);
+
+function refreshDeviceList(){
+
+const sel=document.getElementById("removeDeviceSelect")
+
+sel.innerHTML=myDevices.map((d,i)=>
+`<option value="${i}">${d.name}</option>`
+).join('')
+
 }
 
-.section{
-display:none;
-padding:20px;
+
+async function loadChart(){
+
+const res=await fetch('/analytics/usage-data')
+const usage=await res.json()
+
+const colors=usage.data.map(v=>v>20?'rgba(239,68,68,0.8)':'rgba(16,185,129,0.8)')
+
+const ctx=document.getElementById('usageChart').getContext('2d')
+
+if(myChart)myChart.destroy()
+
+myChart=new Chart(ctx,{
+type:'bar',
+data:{labels:usage.labels,datasets:[{data:usage.data,backgroundColor:colors,borderRadius:12}]},
+options:{plugins:{legend:{display:false}},scales:{y:{grid:{color:'rgba(255,255,255,0.05)'}}}}
+})
+
 }
 
-.card{
-background:white;
-margin:15px;
-padding:20px;
-border-radius:8px;
-box-shadow:0 5px 12px rgba(0,0,0,0.2);
+
+async function loadAdmin(){
+
+const res=await fetch('/admin/all-stats')
+const data=await res.json()
+
+document.getElementById('adm-table').innerHTML=Object.entries(data).map(([u,info])=>`
+<tr class="hover:bg-white/5 transition-all">
+<td class="p-4 text-sky-400 font-black">${u.toUpperCase()}</td>
+<td class="p-4">${info.devices.length} Units</td>
+<td class="p-4 text-emerald-400 font-bold">${info.load} W</td>
+<td class="p-4 text-[9px] font-black uppercase text-slate-500">${info.role}</td>
+</tr>`).join('')
+
 }
 
-.statbox{
-display:inline-block;
-background:linear-gradient(135deg,#43cea2,#185a9d);
-color:white;
-padding:20px;
-margin:10px;
-border-radius:8px;
-width:150px;
-font-weight:bold;
-}
-
-ul{
-list-style:none;
-padding:0;
-}
-
-li{
-background:#f3f6fa;
-margin:5px;
-padding:10px;
-border-radius:6px;
-}
-
-.remove{
-color:red;
-text-decoration:none;
-margin-left:10px;
-}
-
-.export{
-background:linear-gradient(45deg,#11998e,#38ef7d);
-padding:10px 20px;
-border-radius:5px;
-color:white;
-text-decoration:none;
-}
-
-</style><script>
-
-function showSignup(){
-document.getElementById("loginBox").style.display="none";
-document.getElementById("signupBox").style.display="block";
-}
-
-function showLogin(){
-document.getElementById("signupBox").style.display="none";
-document.getElementById("loginBox").style.display="block";
-}
-
-function tab(x){
-document.getElementById("home").style.display="none";
-document.getElementById("devices").style.display="none";
-document.getElementById("analytics").style.display="none";
-document.getElementById(x).style.display="block";
-}
-
-</script></head><body><header>
-Smart Home Energy Dashboard
-</header><!-- LOGIN --><div id="loginBox" class="container"><h2>Login</h2><form action="/login" method="post"><input name="username" placeholder="User ID" required><input name="password" type="password" placeholder="Password" required><br><button type="submit">Login</button>
-
-</form><br><button onclick="showSignup()">Create Account</button>
-
-</div><!-- SIGNUP --><div id="signupBox" class="container" style="display:none"><h2>Create Account</h2><form action="/signup" method="post"><input name="username" placeholder="New User ID" required><input name="password" type="password" placeholder="New Password" required><br><button>Create Account</button>
-
-</form><br><button onclick="showLogin()">Back to Login</button>
-
-</div><!-- DASHBOARD --><div id="dashboard"><div class="tabs"><button onclick="tab('home')">Home</button>
-<button onclick="tab('devices')">Devices</button>
-<button onclick="tab('analytics')">Analytics</button>
-
-</div><!-- HOME --><div id="home" class="section"><div class="statbox">
-Total Load<br>
-{{total_power}} W
-</div><div class="statbox">
-Tariff<br>
-₹{{tariff}}
-</div><div class="statbox">
-Cost<br>
-₹{{cost}}
-</div><div class="card"><h3>Appliances</h3><ul>{% for d in devices %}
-
-<li>{{d[0]}} - {{d[1]}} W</li>{% endfor %}
-
-</ul></div></div><!-- DEVICES --><div id="devices" class="section"><div class="card"><h3>Add Device</h3><form action="/add_device" method="post"><input name="device" placeholder="Device Name"><input name="power" placeholder="Power (W)"><br><button>Add Device</button>
-
-</form></div><div class="card"><h3>Available Devices</h3><ul>{% for d in devices %}
-
-<li>{{d[0]}} - {{d[1]}} W
-
-<a class="remove" href="/delete_device/{{d[0]}}">Remove</a>
-
-</li>{% endfor %}
-
-</ul></div></div><!-- ANALYTICS --><div id="analytics" class="section"><div class="card"><h3>User Energy Analytics</h3><p>Download your usage data</p><a class="export" href="/export">Export Excel</a>
-
-</div></div></div></body>
+</script></body>
 </html>
