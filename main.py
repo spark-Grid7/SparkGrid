@@ -1,149 +1,85 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import random
 import pandas as pd
+import random
+import json
+import os
 
 app = FastAPI()
 
-# Allow browser requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# -------------------------
-# USERS DATABASE
-# -------------------------
+# --- DATABASE SETUP ---
+DB_FILE = "users.json"
+if not os.path.exists(DB_FILE):
+    with open(DB_FILE, "w") as f:
+        json.dump({"admin": {"password": "spark123", "role": "admin"}}, f)
 
-users = {
-    "admin": {"password": "spark123", "role": "admin"},
-    "user1": {"password": "grid123", "role": "user"},
-}
-
-# -------------------------
-# DEVICES (Example)
-# -------------------------
-
+# Initial Device List
 devices = [
-    {"name": "5V Pump", "pin": 23},
-    {"name": "5V LED", "pin": 2}
+    {"name": "5V Pump", "pin": 23, "state": False, "power": 45, "priority": "High"},
+    {"name": "5V LED", "pin": 2, "state": False, "power": 10, "priority": "Low"}
 ]
-
-# -------------------------
-# LOGIN API
-# -------------------------
+config = {"threshold": 100}
 
 @app.post("/login")
 async def login(data: dict):
+    u, p = data.get("username"), data.get("password")
+    with open(DB_FILE, "r") as f: users = json.load(f)
+    if u in users and str(users[u]["password"]) == str(p):
+        return {"status": "ok", "role": users[u]["role"]}
+    return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
-    username = data.get("username")
-    password = data.get("password")
+@app.get("/devices")
+async def get_devices(): return devices
 
-    if username in users and users[username]["password"] == password:
-        return {"status": "ok", "role": users[username]["role"]}
+@app.post("/devices/add")
+async def add_device(data: dict):
+    devices.append({
+        "name": data.get("name"), 
+        "pin": int(data.get("pin")), 
+        "state": False, 
+        "power": 25, 
+        "priority": "Medium"
+    })
+    return {"status": "added"}
 
-    return JSONResponse({"error": "invalid"}, status_code=401)
+@app.post("/devices/remove")
+async def remove_device(data: dict):
+    pin = int(data.get("pin"))
+    global devices
+    devices = [d for d in devices if d["pin"] != pin]
+    return {"status": "removed"}
 
+@app.post("/devices/update-priority")
+async def up_prio(data: dict):
+    pin, prio = int(data.get("pin")), data.get("priority")
+    for d in devices:
+        if d["pin"] == pin: d["priority"] = prio
+    return {"status": "ok"}
 
-# -------------------------
-# LIVE GRID METRICS
-# -------------------------
+@app.post("/grid/threshold")
+async def set_thresh(data: dict):
+    config["threshold"] = int(data.get("limit"))
+    return {"status": "ok"}
 
-@app.get("/grid/live-metrics")
-async def live_metrics():
-
-    watts = round(random.uniform(40,120),2)
-    amps = round(watts/230,3)
-    cost = round(watts * 0.008,2)
-
-    return {
-        "watts": watts,
-        "amps": amps,
-        "cost": cost
-    }
-
-
-# -------------------------
-# ANALYTICS DATA
-# -------------------------
-
-@app.get("/analytics/usage-data")
-async def usage_data():
-
-    labels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
-
-    data = [
-        random.randint(10,35),
-        random.randint(10,35),
-        random.randint(10,35),
-        random.randint(10,35),
-        random.randint(10,35),
-        random.randint(10,35),
-        random.randint(10,35),
-    ]
-
-    return {
-        "labels": labels,
-        "data": data
-    }
-
-
-# -------------------------
-# ADMIN DASHBOARD DATA
-# -------------------------
-
-@app.get("/admin/all-stats")
-async def admin_stats():
-
-    stats = {}
-
-    for u in users:
-        stats[u] = {
-            "devices": devices,
-            "load": random.randint(50,200),
-            "role": users[u]["role"]
-        }
-
-    return stats
-
-
-# -------------------------
-# EXPORT EXCEL
-# -------------------------
+@app.get("/grid/live")
+async def live():
+    w = sum(d["power"] for d in devices if d["state"])
+    return {"watts": w, "amps": round(w/230, 3), "cost": round(w*0.008, 2), "limit": config["threshold"]}
 
 @app.get("/admin/export")
 async def export_excel():
-
-    data = {
-        "Day":["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
-        "Usage":[
-            random.randint(10,35),
-            random.randint(10,35),
-            random.randint(10,35),
-            random.randint(10,35),
-            random.randint(10,35),
-            random.randint(10,35),
-            random.randint(10,35),
-        ]
-    }
-
-    df = pd.DataFrame(data)
-
-    file = "energy_report.xlsx"
-    df.to_excel(file,index=False)
-
-    return FileResponse(file,filename=file)
-
-
-# -------------------------
-# SERVE DASHBOARD
-# -------------------------
+    df = pd.DataFrame({"Day": ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], "Load": [random.randint(40,150) for _ in range(7)]})
+    df.to_excel("report.xlsx", index=False)
+    return FileResponse("report.xlsx", filename="SparkGrid_Report.xlsx")
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    with open("index.html","r",encoding="utf-8") as f:
-        return f.read()
+    with open("index.html", "r", encoding="utf-8") as f: return f.read()
