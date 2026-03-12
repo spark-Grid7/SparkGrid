@@ -65,12 +65,14 @@ async def live():
     }
 
 @app.post("/devices/toggle")
-async def toggle(data: dict):
+async def toggle_device(data: dict):
     pin = int(data.get("pin"))
     for d in devices:
-        if d["pin"] == pin: d["state"] = not d["state"]
-    return {"status": "ok"}
-
+        if d["pin"] == pin:
+            d["state"] = not d["state"] # Flips the state (ON/OFF)
+            return {"status": "success", "new_state": d["state"]}
+    return JSONResponse({"error": "Device not found"}, status_code=404)
+    
 @app.post("/grid/threshold")
 async def set_limit(data: dict):
     config["threshold"] = int(data.get("limit"))
