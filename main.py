@@ -21,12 +21,15 @@ if not os.path.exists(DB_FILE):
     with open(DB_FILE, "w") as f:
         json.dump({"admin": {"password": "spark123", "role": "admin"}}, f)
 
-# Initial Device List
+# Initial Device List for your 5V Motor and LED
 devices = [
     {"name": "5V Pump", "pin": 23, "state": False, "power": 45, "priority": "High"},
     {"name": "5V LED", "pin": 2, "state": False, "power": 10, "priority": "Low"}
 ]
 config = {"threshold": 100}
+
+@app.get("/devices")
+async def get_devices(): return devices
 
 @app.post("/login")
 async def login(data: dict):
@@ -35,9 +38,6 @@ async def login(data: dict):
     if u in users and str(users[u]["password"]) == str(p):
         return {"status": "ok", "role": users[u]["role"]}
     return JSONResponse({"error": "Unauthorized"}, status_code=401)
-
-@app.get("/devices")
-async def get_devices(): return devices
 
 @app.post("/devices/add")
 async def add_device(data: dict):
@@ -56,6 +56,16 @@ async def remove_device(data: dict):
     global devices
     devices = [d for d in devices if d["pin"] != pin]
     return {"status": "removed"}
+
+# --- NEW TOGGLE ROUTE ADDED HERE ---
+@app.post("/devices/toggle")
+async def toggle_device(data: dict):
+    pin = int(data.get("pin"))
+    for d in devices:
+        if d["pin"] == pin:
+            d["state"] = not d["state"] 
+            return {"status": "success", "new_state": d["state"]}
+    return JSONResponse({"error": "Not found"}, status_code=404)
 
 @app.post("/devices/update-priority")
 async def up_prio(data: dict):
