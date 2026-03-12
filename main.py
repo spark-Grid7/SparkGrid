@@ -7,10 +7,34 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # Database for Login
-DB_FILE = "users.json"
-if not os.path.exists(DB_FILE):
-    with open(DB_FILE, "w") as f: json.dump({"admin": {"password": "spark123"}}, f)
+# Replace the old login function with this one to bypass "Access Denied"
+@app.post("/login")
+async def login(data: dict):
+    u, p = data.get("username"), data.get("password")
+    # Hardcoded for the demo to ensure it always works at Velammal College
+    if u == "admin" and p == "spark123":
+        return {"status": "ok", "role": "admin"}
+    return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
+# Ensure this matches your 5V Pump connection (Pin 23)
+@app.get("/grid/live")
+async def live():
+    total_watts = sum(d["power"] for d in devices if d["state"])
+    
+    # AUTO-SHEDDING Logic
+    if total_watts > config["threshold"]:
+        for d in devices:
+            if d["priority"] == "Low": d["state"] = False
+        total_watts = sum(d["power"] for d in devices if d["state"])
+
+    # Mapping to ESP32: nonessential = Pin 23 (Pump)
+    return {
+        "watts": total_watts,
+        "limit": config["threshold"],
+        "essential": 1 if next(d for d in devices if d["pin"]==26)["state"] else 0,
+        "nonessential": 1 if next(d for d in devices if d["pin"]==23)["state"] else 0,
+        "cost": round(total_watts * 0.008, 2)
+    }
 # Device Configuration
 devices = [
     {"name": "5V Pump", "pin": 26, "power": 45, "state": False, "priority": "Low"},
